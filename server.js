@@ -1,3 +1,4 @@
+// server.js
 const express = require("express");
 const http = require("http");
 const socketIo = require("socket.io");
@@ -6,47 +7,50 @@ const cors = require("cors");
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server, { cors: { origin: "*" } });
+const io = socketIo(server, {
+  cors: { origin: "*", methods: ["GET", "POST"] },
+  transports: ["websocket", "polling"],
+  pingInterval: 25000,
+  pingTimeout: 50000,
+});
 
 app.use(cors());
 app.use(bodyParser.json());
 
-const PORT = process.env.PORT || 3001;
-const SECRET = "MI_SECRET_REALEST"; // mismo valor que en WP
+const PORT = process.env.PORT || 3000;
+const SECRET = process.env.SECRET || "MI_SECRET_REALEST"; // 👈 pon el mismo valor en Render env vars
 
-// Almacenar mensajes por sala (opcional, para historial rápido)
+// Historial simple por sala en memoria
 const roomsMessages = {};
 
-// Manejo de conexiones WebSocket
+// Salud / diagnóstico rápido
+app.get("/", (_, res) => res.send("OK"));
+app.get("/health", (_, res) => res.json({ ok: true }));
+
 io.on("connection", (socket) => {
-  console.log("Cliente conectado:", socket.id);
+  console.log("✅ Cliente conectado:", socket.id);
 
-  // Unirse a una sala
-  socket.on("join_room", (roomId) => {
+  socket.on("join_room", (roomId = "general") => {
     socket.join(roomId);
-    console.log(`Cliente ${socket.id} se unió a la sala ${roomId}`);
+    console.log(`📌 Cliente ${socket.id} entró en sala ${roomId}`);
 
-    // Enviar historial si existe
+    // Enviar historial previo
     if (roomsMessages[roomId]) {
-      roomsMessages[roomId].forEach(msg => socket.emit("new_message", msg));
+      roomsMessages[roomId].forEach((msg) => socket.emit("new_message", msg));
     }
   });
 
-  // Recibir mensajes desde el widget y reemitir
   socket.on("new_message", (msg) => {
     const roomId = msg.room_id || "general";
-    
-    // Guardar en historial
     if (!roomsMessages[roomId]) roomsMessages[roomId] = [];
     roomsMessages[roomId].push(msg);
 
-    // Emitir solo a otros clientes en la sala
-    socket.to(roomId).emit("new_message", msg);
-    console.log(`💬 Mensaje de ${msg.sender} a sala ${roomId}: ${msg.message}`);
+    io.to(roomId).emit("new_message", msg); // envía a todos (incluido emisor si quieres)
+    console.log(`💬 ${msg.sender} → ${roomId}: ${msg.message}`);
   });
 
   socket.on("disconnect", () => {
-    console.log("Cliente desconectado:", socket.id);
+    console.log("❌ Cliente desconectado:", socket.id);
   });
 });
 
@@ -61,14 +65,11 @@ app.post("/new-message", (req, res) => {
 
   if (action === "new_message" && message) {
     const roomId = message.room_id || "general";
-
-    // Guardar en historial
     if (!roomsMessages[roomId]) roomsMessages[roomId] = [];
     roomsMessages[roomId].push(message);
 
-    // Emitir a todos en la sala
     io.to(roomId).emit("new_message", message);
-    console.log(`✅ Mensaje recibido desde WordPress y enviado a sala ${roomId}: ${message.message}`);
+    console.log(`📨 WP → ${roomId}: ${message.message}`);
   } else {
     console.log("⚠️ Acción no reconocida o mensaje vacío");
   }
@@ -76,9 +77,7 @@ app.post("/new-message", (req, res) => {
   res.json({ status: "ok" });
 });
 
-// Escuchar en todas las interfaces de red
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Servidor WebSocket corriendo en http://0.0.0.0:${PORT}`);
-  console.log(`Accesible en la red local usando tu IP: http://TU_IP_LOCAL:${PORT}`);
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`🚀 Servidor escuchando en puerto ${PORT}`);
 });
 
