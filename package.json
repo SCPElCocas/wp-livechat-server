@@ -1,18 +1,19 @@
 {
   "name": "wp-livechat-server",
   "version": "1.0.0",
-  "description": "Servidor WebSocket para livechat con Node y Socket.IO",
+  "description": "Servidor Socket.IO para WP Livechat",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "engines": {
+    "node": "22.x"
+  },
+  "license": "MIT",
   "dependencies": {
-    "body-parser": "^1.20.2",
+    "body-parser": "^2.2.0",
     "cors": "^2.8.5",
-    "express": "^4.18.2",
+    "express": "^5.1.0",
     "socket.io": "^4.8.1"
   }
 }
