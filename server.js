@@ -18,40 +18,35 @@ app.use(cors());
 app.use(bodyParser.json());
 
 const PORT = process.env.PORT || 3000;
-const SECRET = process.env.SECRET || "MI_SECRET_REALEST";
+const SECRET = process.env.SECRET || "MI_SECRET_REALEST"; // 👈 pon el mismo valor en Render env vars
 
-// Historial simple en memoria
+// Historial simple por sala en memoria
 const roomsMessages = {};
 
-// Endpoints básicos
+// Salud / diagnóstico rápido
 app.get("/", (_, res) => res.send("OK"));
 app.get("/health", (_, res) => res.json({ ok: true }));
 
 io.on("connection", (socket) => {
   console.log("✅ Cliente conectado:", socket.id);
 
-  // Unirse a una sala
   socket.on("join_room", (roomId = "general") => {
     socket.join(roomId);
     console.log(`📌 Cliente ${socket.id} entró en sala ${roomId}`);
 
-    // Enviar historial existente
+    // Enviar historial previo
     if (roomsMessages[roomId]) {
-      roomsMessages[roomId].forEach((msg) =>
-        socket.emit("new_message", msg)
-      );
+      roomsMessages[roomId].forEach((msg) => socket.emit("new_message", msg));
     }
   });
 
-  // Recibir mensajes de la APP (usamos "send_message" para no chocar)
-  socket.on("send_message", (msg) => {
+  socket.on("new_message", (msg) => {
     const roomId = msg.room_id || "general";
     if (!roomsMessages[roomId]) roomsMessages[roomId] = [];
     roomsMessages[roomId].push(msg);
 
-    // Emitimos a todos en la sala unificado como "new_message"
-    io.to(roomId).emit("new_message", msg);
-    console.log(`💬 [APP] ${msg.sender} → ${roomId}: ${msg.message}`);
+    io.to(roomId).emit("new_message", msg); // envía a todos (incluido emisor si quieres)
+    console.log(`💬 ${msg.sender} → ${roomId}: ${msg.message}`);
   });
 
   socket.on("disconnect", () => {
@@ -74,7 +69,7 @@ app.post("/new-message", (req, res) => {
     roomsMessages[roomId].push(message);
 
     io.to(roomId).emit("new_message", message);
-    console.log(`📨 [WP] → ${roomId}: ${message.message}`);
+    console.log(`📨 WP → ${roomId}: ${message.message}`);
   } else {
     console.log("⚠️ Acción no reconocida o mensaje vacío");
   }
@@ -85,5 +80,4 @@ app.post("/new-message", (req, res) => {
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Servidor escuchando en puerto ${PORT}`);
 });
-
 
